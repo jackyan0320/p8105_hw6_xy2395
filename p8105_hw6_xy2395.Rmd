@@ -1,0 +1,20 @@
+---
+title: "P8105_hw6_xy2395"
+author: "Jack Yan"
+date: "11/16/2018"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+homicide_df = 
+  read_csv("./data/homicide-data.csv") %>% 
+  mutate(city_state = str_c(city, ", ", state),
+         disposition = as.factor(disposition))
+```
+
+
