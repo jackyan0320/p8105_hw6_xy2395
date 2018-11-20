@@ -26,6 +26,7 @@ homicide_df =
   # Omit some cities
   filter(!city_state %in% c('Dallas, TX', 'Phoenix, AZ', 'Kansas City, MO', 'Tulsa, AL')) %>% 
   # Modifiy victim_race to have categories white and non-white, with white as the reference category. 
+  filter(victim_race != "Unknown") %>% 
   mutate(victim_race = if_else(victim_race == "White", "white", "non-white"),
          victim_race = fct_relevel(victim_race, "white")) %>%
   # Be sure that victim_age is numeric
@@ -137,6 +138,7 @@ Comment:
 
 
 ## Problem 2
+
 ```{r}
 weight_df = 
   read_csv("./data/birthweight.csv") %>% 
@@ -146,12 +148,16 @@ weight_df =
     malform = as.factor(malform),
     mrace = as.factor(mrace)
   )
+
 str(weight_df)
 
 fit_all = lm(bwt ~ ., data = weight_df)
 summary(fit_all)
+
 fit_1 = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken + parity+fincome+wtgain, data = weight_df)
 summary(fit_1)
+weight_df[is.na(weight_df)] <- "0"
+
 
 ```
 
