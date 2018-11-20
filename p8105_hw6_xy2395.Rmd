@@ -137,4 +137,22 @@ Comment:
 
 
 ## Problem 2
+```{r}
+weight_df = 
+  read_csv("./data/birthweight.csv") %>% 
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    malform = as.factor(malform),
+    mrace = as.factor(mrace)
+  )
+str(weight_df)
+
+fit_all = lm(bwt ~ ., data = weight_df)
+summary(fit_all)
+fit_1 = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken + parity+fincome+wtgain, data = weight_df)
+summary(fit_1)
+
+```
+
 
