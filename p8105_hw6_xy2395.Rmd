@@ -9,6 +9,8 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(broom)
+library(modelr)
+library(mgcv)
 ```
 
 
@@ -139,6 +141,8 @@ Comment:
 
 ## Problem 2
 
+### Data manipulation
+
 ```{r}
 weight_df = 
   read_csv("./data/birthweight.csv") %>% 
@@ -150,15 +154,75 @@ weight_df =
   )
 
 str(weight_df)
+```
 
+### Fit a model
+
+`Describe your modeling process` 
+
+```{r }
 fit_all = lm(bwt ~ ., data = weight_df)
 summary(fit_all)
 
-fit_1 = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken + parity+fincome+wtgain, data = weight_df)
-summary(fit_1)
-weight_df[is.na(weight_df)] <- "0"
+fit_mine = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken, data = weight_df)
+summary(fit_mine)
 
+fit_mine_1 = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken + bhead*babysex + blength*babysex + bhead*blength*babysex, data = weight_df)
+summary(fit_mine_1)
+
+read_csv("./data/birthweight.csv") %>%  
+  cor()
+```
+
+### Ploting
+
+and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+
+```{r}
+
+weight_df %>% 
+  add_predictions(fit_mine) %>%
+  add_residuals(fit_mine) %>%
+  ggplot(aes(y = resid, x = pred)) + 
+  geom_point() 
 
 ```
 
+### Compare your model to two others
+
+```{r}
+fit_alt_1 = lm(bwt ~ blength + gaweeks, data = weight_df)
+fit_alt_2 = lm(bwt ~ bhead*blength*babysex, data = weight_df)
+
+summary(fit_alt_1)
+summary(fit_alt_2)
+```
+
+```{r}
+cv_df = 
+  crossv_mc(weight_df, n = 100) %>% 
+  mutate(train = map(train, as_tibble),
+         test  = map(test, as_tibble))
+
+cv_df = 
+  cv_df %>% 
+  mutate(mine  = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken, data = .x)),
+         alt_1 = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         alt_2 = map(train, ~lm(bwt ~ bhead*blength*babysex, data = .x))
+  ) %>% 
+  mutate(rmse_mine  = map2_dbl(mine,  test, ~rmse(model = .x, data = .y)),
+         rmse_alt_1 = map2_dbl(alt_1, test, ~rmse(model = .x, data = .y)),
+         rmse_alt_2 = map2_dbl(alt_2, test, ~rmse(model = .x, data = .y))
+  )
+           
+```
+
+```{r}
+cv_df %>% 
+  select(starts_with('rmse')) %>% 
+  gather(key = model, value = rmse, rmse_mine:rmse_alt_2) %>% 
+  group_by(model) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+    geom_violin()
+```
 
