@@ -14,11 +14,13 @@ library(mgcv)
 ```
 
 
-## Problem 1
+# Problem 1
 
-### Data manipulation
- 
-```{r}
+## Data manipulation
+
+Import the data and do some tidying per problem requirement.
+
+```{r, message=FALSE, warning=FALSE}
 homicide_df = 
   read_csv("./data/homicide-data.csv") %>% 
   # Create a city_state variable
@@ -36,10 +38,9 @@ homicide_df =
   
 ```
 
-### Baltimore, MD
+## Fit a logistic regression for Baltimore, MD
 
-
-```{r}
+```{r, message=FALSE, warning=FALSE}
 # fit a logistic regression
 fit_logistic = 
   homicide_df %>% 
@@ -55,64 +56,66 @@ estimate =
   select(term, log_OR = estimate, OR, p.value) %>% 
   filter(str_detect(term, "non-white") == TRUE)
 
-# obtain the CI of OR
-
+# obtain the CI 
 ci =
-  suppressWarnings(
-    confint(fit_logistic) %>% broom::tidy() %>% 
-    mutate('95%_CI_lower_bound' = exp(X2.5..),
-           '95%_CI_upper_bound' = exp(X97.5..)) %>% 
-    filter(str_detect(.rownames, "non-white") == TRUE)
-  )
-# conbine columns 
+  confint(fit_logistic) %>% broom::tidy() %>% 
+  mutate('95%_CI_lower' = exp(X2.5..),
+         '95%_CI_upper' = exp(X97.5..)) %>% 
+  filter(str_detect(.rownames, "non-white") == TRUE)
+
+# combine the estimate and CI 
 bind_cols(estimate, ci) %>% 
   mutate(city = "Baltimore, MD") %>% 
-  select(city, OR, `95%_CI_lower_bound`, `95%_CI_upper_bound`)
+  select(city, OR, `95%_CI_lower`, `95%_CI_upper`) %>% 
+  knitr::kable(digits = 3)
 ```
 
-Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+## Iteration
+
+First build a function for fitting a glm and calculating the estimates and CIs.
 
 ```{r}
-# build a function
-run_glm = function(city_name){
+# build a function with city_state specific data as the input
+run_glm <- function(data_subset){
   # fit a logistic regression
   fit_logistic = 
-    homicide_df %>% 
-    filter(city_state == city_name) %>% 
-    glm(resolved ~ victim_age + victim_sex + victim_race, data = ., family = binomial())
+    glm(resolved ~ victim_age + victim_sex + victim_race, data = data_subset, family = binomial())
   
   # obtain the estimate of OR
   estimate =
     fit_logistic %>% 
     broom::tidy() %>% 
     mutate(OR = exp(estimate)) %>%
-    # the estimate givrn by the model is log odds ratio
+    # the estimate given by the model is log odds ratio
     select(term, log_OR = estimate, OR, p.value) %>% 
     filter(str_detect(term, "non-white") == TRUE)
   
   # obtain the CI of OR
-  
   ci =
   suppressWarnings(
     confint(profile(fit_logistic)) %>% broom::tidy() %>% 
-    mutate('95%_CI_lower_bound' = exp(X2.5..),
-           '95%_CI_upper_bound' = exp(X97.5..)
+    mutate('95%_CI_lower' = exp(X2.5..),
+           '95%_CI_upper' = exp(X97.5..)
     ) %>% 
     filter(str_detect(.rownames, "non-white") == TRUE)
   )
+  
   # conbine columns 
   bind_cols(estimate, ci) %>% 
-    mutate(city_state = city_name) %>% 
-    select(city_state, OR, `95%_CI_lower_bound`, `95%_CI_upper_bound`)
+    select(OR, `95%_CI_lower`, `95%_CI_upper`)
 }
 ```
+
+Then iterate among the `city_state`s in a tidy pipeline.
 
 ```{r, message=FALSE}
 result_df = 
   homicide_df %>% 
-  distinct(city_state) %>% 
-  .$city_state %>% 
-  map_df(., run_glm) 
+  group_by(city_state) %>% 
+  nest() %>%
+  mutate(result = map(data, run_glm)) %>% 
+  select(-data) %>% 
+  unnest()
 ```
 
 Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
@@ -122,8 +125,8 @@ result_df %>%
   mutate(city_state = fct_reorder(city_state, OR)) %>% 
   ggplot(aes(x = city_state, 
              y = OR, 
-             ymin = `95%_CI_lower_bound`, 
-             ymax = `95%_CI_upper_bound`)
+             ymin = `95%_CI_lower`, 
+             ymax = `95%_CI_upper`)
   ) +
     geom_point() +
     geom_errorbar() +
@@ -143,11 +146,13 @@ Comment:
 For most of the cities, the estimates for odds ratio are below 1.0, and 1.0 are not included in their 95% confidence intervals, showing significantly lower estimated odds of solving homicides among non-white victims compared with white victims for those cities. The confidence intervals for some cities (such as Boston, MA) are narrow, so we can be more confident about future predictions for these cities.
 
 
-## Problem 2
+# Problem 2
 
-### Data manipulation
+## Data manipulation
 
-```{r}
+Import the data, and convert some numeric variables to categorical according to the dataset description.
+
+```{r, message = FALSE}
 weight_df = 
   read_csv("./data/birthweight.csv") %>% 
   mutate(
@@ -157,39 +162,46 @@ weight_df =
     mrace = as.factor(mrace)
   )
 
-str(weight_df)
 ```
 
-### Fit a model
+## Fit a model
 
-`Describe your modeling process` 
+### Building my model
+
+First, I checked the correlation among the parameters. The BMI and weight are correlated, and father's race and mother's race are correlated. Those correlated parameters may not be included in the model simultaneously. Then I put all the parameters in the exploratory model, and checked the summary of the fit. I would use all the parameters with p-value < 0.01 as predictors in my model. I also tried adding or deleting some variables to the model, and compared the resulting p-value and adjusted R-squared value. Although the other models I tried are not shown below, my final model gave the highest adjusted R-squared value, and all the predictors in it had p_values < 0.001.
 
 ```{r }
+cor_matrix = 
+  read_csv("./data/birthweight.csv") %>%  
+  cor() %>% 
+  tidy() %>% select(-pnumlbw, -pnumsga,-bwt) %>% 
+  filter(.rownames != "pnumlbw", .rownames != "pnumsga", .rownames != "bwt") 
+
 fit_all = lm(bwt ~ ., data = weight_df)
 summary(fit_all)
 
 fit_mine = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken, data = weight_df)
 summary(fit_mine)
 
-read_csv("./data/birthweight.csv") %>%  
-  cor()
 ```
 
 ### Ploting
 
-Show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+Show a plot of model residuals against fitted values.
 
-```{r}
+```{r fig.width=15}
 
 weight_df %>% 
   add_predictions(fit_mine) %>%
   add_residuals(fit_mine) %>%
   ggplot(aes(y = resid, x = pred)) + 
-  geom_point(alpha = 0.3) 
+  geom_point(alpha = 0.25) 
 
 ```
 
-### Compare your model to two others
+## Compare my model to two others
+
+### Summary of the two alternative models
 
 ```{r}
 fit_alt_1 = lm(bwt ~ blength + gaweeks, data = weight_df)
@@ -199,12 +211,16 @@ summary(fit_alt_1)
 summary(fit_alt_2)
 ```
 
+#### Cross Validation 
+
 ```{r}
+# setup training and testing datasets.
 cv_df = 
   crossv_mc(weight_df, n = 100) %>% 
   mutate(train = map(train, as_tibble),
          test  = map(test, as_tibble))
 
+# run the cross validation
 cv_df = 
   cv_df %>% 
   mutate(mine  = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken, data = .x)),
@@ -218,6 +234,8 @@ cv_df =
            
 ```
 
+Plot the distribution of RMSEs for the three models.
+
 ```{r}
 cv_df %>% 
   select(starts_with('rmse')) %>% 
@@ -226,4 +244,6 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) +
     geom_violin()
 ```
+
+As the plot shows, the first model has the highest overall RMSE, because it is too simple. The second model has a lower RMSE, because it takes into account the interaction among bhead, blength, and babysex. The model I built has the lowest overall distribution of RMSE, showing better prediction accuracy.
 
