@@ -127,16 +127,20 @@ result_df %>%
   ) +
     geom_point() +
     geom_errorbar() +
+    theme_bw() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, size = rel(0.8))) +
     labs(
       x = "City",
       y = "OR",
-      title = "Odds ratio and CI for solving homicides comparing non-white victims to white victims"
+      title = "Odds ratios and CIs for solving homicides"
     )
+
   
 ```
 
 Comment:
+
+For most of the cities, the estimates for odds ratio are below 1.0, and 1.0 are not included in their 95% confidence intervals, showing significantly lower estimated odds of solving homicides among non-white victims compared with white victims for those cities. The confidence intervals for some cities (such as Boston, MA) are narrow, so we can be more confident about future predictions for these cities.
 
 
 ## Problem 2
@@ -167,16 +171,13 @@ summary(fit_all)
 fit_mine = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken, data = weight_df)
 summary(fit_mine)
 
-fit_mine_1 = lm(bwt ~ babysex + bhead + blength + delwt + gaweeks + mrace + smoken + bhead*babysex + blength*babysex + bhead*blength*babysex, data = weight_df)
-summary(fit_mine_1)
-
 read_csv("./data/birthweight.csv") %>%  
   cor()
 ```
 
 ### Ploting
 
-and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+Show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
 
 ```{r}
 
@@ -184,7 +185,7 @@ weight_df %>%
   add_predictions(fit_mine) %>%
   add_residuals(fit_mine) %>%
   ggplot(aes(y = resid, x = pred)) + 
-  geom_point() 
+  geom_point(alpha = 0.3) 
 
 ```
 
